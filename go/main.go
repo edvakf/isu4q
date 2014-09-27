@@ -17,8 +17,6 @@ import (
 	"github.com/martini-contrib/render"
 	"github.com/martini-contrib/sessions"
 	"github.com/walf443/stopwatch"
-	"net/http"
-	"strconv"
 )
 
 var db *sql.DB
@@ -77,6 +75,7 @@ func main() {
 	m.Post("/login", func(req *http.Request, r render.Render, session sessions.Session) {
 		stopwatch.Reset("POST /login")
 		user, err := attemptLogin(req)
+		stopwatch.Watch("after attemptLogin")
 
 		notice := ""
 		if err != nil || user == nil {
