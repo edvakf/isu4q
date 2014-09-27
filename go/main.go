@@ -2,13 +2,20 @@ package main
 
 import (
 	"database/sql"
+	"flag"
 	"fmt"
+	"log"
+	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"strconv"
+	"syscall"
+
 	"github.com/go-martini/martini"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/martini-contrib/render"
 	"github.com/martini-contrib/sessions"
-	"net/http"
-	"strconv"
 )
 
 var db *sql.DB
@@ -45,8 +52,11 @@ func init() {
 	}
 }
 
+var port = flag.Uint("port", 0, "port to listen")
+
 func main() {
 	m := martini.Classic()
+	flag.Parse()
 
 	store := sessions.NewCookieStore([]byte("secret-isucon"))
 	m.Use(sessions.Sessions("isucon_go_session", store))
@@ -103,5 +113,31 @@ func main() {
 		})
 	})
 
-	http.ListenAndServe(":8080", m)
+	sigchan := make(chan os.Signal)
+	signal.Notify(sigchan, os.Interrupt)
+	signal.Notify(sigchan, syscall.SIGTERM)
+	signal.Notify(sigchan, syscall.SIGINT)
+
+	var l net.Listener
+	var err error
+	if *port == 0 {
+		ferr := os.Remove("/dev/shm/server.sock")
+		if ferr != nil {
+			if !os.IsNotExist(ferr) {
+				panic(ferr.Error())
+			}
+		}
+		l, err = net.Listen("unix", "/dev/shm/server.sock")
+		os.Chmod("/dev/shm/server.sock", 0777)
+	} else {
+		l, err = net.ListenTCP("tcp", &net.TCPAddr{Port: int(*port)})
+	}
+	if err != nil {
+		panic(err.Error())
+	}
+	go func() {
+		log.Println(http.Serve(l, m))
+	}()
+
+	<-sigchan
 }
