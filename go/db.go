@@ -65,14 +65,9 @@ func isLockedUser(user *User) (bool, error) {
 }
 
 func isBannedIP(ip string) (bool, error) {
-	var err error
 	cnt, found := getFailureCount(ip)
 	if !found {
-		cnt, err = getFailureCountFromDB(ip)
-		if err != nil {
-			return false, err
-		}
-		setFailureCount(ip, cnt)
+		setFailureCount(ip, 0)
 	}
 
 	return IPBanThreshold <= cnt, nil

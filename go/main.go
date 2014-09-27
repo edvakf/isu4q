@@ -173,5 +173,23 @@ func initialize() {
 
 	gocache.Flush()
 
+	setFailureCacheFromDB()
+
 	log.Println("initialize end")
+}
+
+func setFailureCacheFromDB() {
+	rows, err := db.Query("SELECT DISTINCT ip FROM login_log")
+	if err != nil {
+		log.Fatal(err)
+	}
+	for rows.Next() {
+		var ip string
+		rows.Scan(&ip)
+		cnt, err := getFailureCountFromDB(ip)
+		if err != nil {
+			log.Fatal(err)
+		}
+		setFailureCount(ip, cnt)
+	}
 }
