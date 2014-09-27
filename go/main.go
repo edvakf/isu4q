@@ -29,6 +29,7 @@ var (
 )
 var gocache = goCache.New(30*time.Second, 10*time.Second)
 var radix *Radix.Pool
+var loginLogCh chan LoginLog
 
 func init() {
 	dsn := fmt.Sprintf(
@@ -39,6 +40,8 @@ func init() {
 		getEnv("ISU4_DB_PORT", "3306"),
 		getEnv("ISU4_DB_NAME", "isu4_qualifier"),
 	)
+
+	loginLogCh = make(chan LoginLog)
 
 	var err error
 

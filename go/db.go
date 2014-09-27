@@ -10,6 +10,16 @@ import (
 	"github.com/walf443/stopwatch"
 )
 
+type LoginLog struct {
+	time time.Time
+	userId sql.NullInt64
+	login string
+	remoteAddr string
+	succ int
+}
+
+var loginLogBuffer []LoginLog
+
 var (
 	ErrBannedIP      = errors.New("Banned IP")
 	ErrLockedUser    = errors.New("Locked user")
@@ -29,12 +39,6 @@ func createLoginLog(succeeded bool, remoteAddr, login string, user *User) error 
 		userId.Valid = true
 	}
 
-	_, err := db.Exec(
-		"INSERT INTO login_log (`created_at`, `user_id`, `login`, `ip`, `succeeded`) "+
-			"VALUES (?,?,?,?,?)",
-		time.Now(), userId, login, remoteAddr, succ,
-	)
-
 	if succeeded {
 		setFailureCount(remoteAddr, 0)
 		setFailureCountByUser(user.ID, 0)
@@ -43,7 +47,22 @@ func createLoginLog(succeeded bool, remoteAddr, login string, user *User) error 
 		incrementFailureCountByUser(user.ID)
 	}
 
-	return err
+	var log LoginLog
+	log.time = time.Now()
+	log.userId = userId
+	log.login = login
+	log.remoteAddr = remoteAddr
+	log.succ = succ
+	loginLogCh <- log
+	go func() {
+		db.Exec(
+			"INSERT INTO login_log (`created_at`, `user_id`, `login`, `ip`, `succeeded`) "+
+				"VALUES (?,?,?,?,?)",
+			time.Now(), userId, login, remoteAddr, succ,
+		)
+	}()
+
+	return nil
 }
 
 func isLockedUser(user *User) (bool, error) {
