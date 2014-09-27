@@ -3,8 +3,10 @@ package main
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
+
 	"github.com/walf443/stopwatch"
 )
 
@@ -32,6 +34,12 @@ func createLoginLog(succeeded bool, remoteAddr, login string, user *User) error 
 			"VALUES (?,?,?,?,?)",
 		time.Now(), userId, login, remoteAddr, succ,
 	)
+
+	if succeeded {
+		setFailureCount(remoteAddr, 0)
+	} else {
+		incrementFailureCount(remoteAddr)
+	}
 
 	return err
 }
@@ -61,6 +69,20 @@ func isLockedUser(user *User) (bool, error) {
 }
 
 func isBannedIP(ip string) (bool, error) {
+	var err error
+	cnt, found := getFailureCount(ip)
+	if !found {
+		cnt, err = getFailureCountFromDB(ip)
+		if err != nil {
+			return false, err
+		}
+		setFailureCount(ip, cnt)
+	}
+
+	return IPBanThreshold <= cnt, nil
+}
+
+func getFailureCountFromDB(ip string) (int, error) {
 	var ni sql.NullInt64
 	row := db.QueryRow(
 		"SELECT COUNT(1) AS failures FROM login_log WHERE "+
@@ -72,12 +94,34 @@ func isBannedIP(ip string) (bool, error) {
 
 	switch {
 	case err == sql.ErrNoRows:
-		return false, nil
+		return 0, nil
 	case err != nil:
-		return false, err
+		return 0, err
 	}
 
-	return IPBanThreshold <= int(ni.Int64), nil
+	return int(ni.Int64), nil
+}
+
+func getFailureCount(ip string) (int, bool) {
+	key := fmt.Sprintf("failure-ip-%s", ip)
+	val, found := gocache.Get(key)
+	if !found {
+		return 0, false
+	}
+	return val.(int), true
+}
+
+func setFailureCount(ip string, cnt int) {
+	key := fmt.Sprintf("failure-ip-%s", ip)
+	gocache.Set(key, cnt, -1)
+}
+
+func incrementFailureCount(ip string) {
+	key := fmt.Sprintf("failure-ip-%s", ip)
+	err := gocache.Increment(key, 1)
+	if err != nil {
+		gocache.Set(key, 1, -1)
+	}
 }
 
 func attemptLogin(req *http.Request) (*User, error) {
