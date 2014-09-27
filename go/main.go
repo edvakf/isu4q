@@ -11,11 +11,14 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
+	"time"
 
+	Radix "github.com/fzzy/radix/extra/pool"
 	"github.com/go-martini/martini"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/martini-contrib/render"
 	"github.com/martini-contrib/sessions"
+	goCache "github.com/pmylund/go-cache"
 	"github.com/walf443/stopwatch"
 )
 
@@ -24,6 +27,8 @@ var (
 	UserLockThreshold int
 	IPBanThreshold    int
 )
+var gocache = goCache.New(30*time.Second, 10*time.Second)
+var radix *Radix.Pool
 
 func init() {
 	dsn := fmt.Sprintf(
@@ -54,11 +59,18 @@ func init() {
 }
 
 var port = flag.Uint("port", 0, "port to listen")
+var redisport = flag.Uint("redis", 0, "port to redis")
 
 func main() {
-	flag.Parse()
 	m := martini.Classic()
 	flag.Parse()
+
+	var err error
+	if *redisport == 0 {
+		radix, err = Radix.NewPool("unix", "/tmp/redis.sock", 10)
+	} else {
+		radix, err = Radix.NewPool("tcp", fmt.Sprintf(":%d", *redisport), 10)
+	}
 
 	store := sessions.NewCookieStore([]byte("secret-isucon"))
 	m.Use(sessions.Sessions("isucon_go_session", store))
@@ -129,7 +141,6 @@ func main() {
 	signal.Notify(sigchan, syscall.SIGINT)
 
 	var l net.Listener
-	var err error
 	if *port == 0 {
 		ferr := os.Remove("/dev/shm/server.sock")
 		if ferr != nil {
