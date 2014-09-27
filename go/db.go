@@ -37,8 +37,10 @@ func createLoginLog(succeeded bool, remoteAddr, login string, user *User) error 
 
 	if succeeded {
 		setFailureCount(remoteAddr, 0)
+		setFailureCountByUser(user.ID, 0)
 	} else {
 		incrementFailureCount(remoteAddr)
+		incrementFailureCountByUser(user.ID)
 	}
 
 	return err
@@ -48,24 +50,18 @@ func isLockedUser(user *User) (bool, error) {
 	if user == nil {
 		return false, nil
 	}
+	var err error
 
-	var ni sql.NullInt64
-	row := db.QueryRow(
-		"SELECT COUNT(1) AS failures FROM login_log WHERE "+
-			"user_id = ? AND id > IFNULL((select id from login_log where user_id = ? AND "+
-			"succeeded = 1 ORDER BY id DESC LIMIT 1), 0);",
-		user.ID, user.ID,
-	)
-	err := row.Scan(&ni)
-
-	switch {
-	case err == sql.ErrNoRows:
-		return false, nil
-	case err != nil:
-		return false, err
+	cnt, found := getFailureCountByUser(user.ID)
+	if !found {
+		cnt, err = getFailureCountUserFromDB(user.ID)
+		if err != nil {
+			return false, err
+		}
+		setFailureCountByUser(user.ID, cnt)
 	}
 
-	return UserLockThreshold <= int(ni.Int64), nil
+	return UserLockThreshold <= cnt, nil
 }
 
 func isBannedIP(ip string) (bool, error) {
@@ -102,6 +98,25 @@ func getFailureCountFromDB(ip string) (int, error) {
 	return int(ni.Int64), nil
 }
 
+func getFailureCountUserFromDB(user int) (int, error) {
+	var ni sql.NullInt64
+	row := db.QueryRow(
+		"SELECT COUNT(1) AS failures FROM login_log WHERE "+
+			"user_id = ? AND id > IFNULL((select id from login_log where user_id = ? AND "+
+			"succeeded = 1 ORDER BY id DESC LIMIT 1), 0);",
+		user, user,
+	)
+	err := row.Scan(&ni)
+
+	switch {
+	case err == sql.ErrNoRows:
+		return 0, nil
+	case err != nil:
+		return 0, err
+	}
+
+	return int(ni.Int64), nil
+}
 func getFailureCount(ip string) (int, bool) {
 	key := fmt.Sprintf("failure-ip-%s", ip)
 	val, found := gocache.Get(key)
@@ -118,6 +133,29 @@ func setFailureCount(ip string, cnt int) {
 
 func incrementFailureCount(ip string) {
 	key := fmt.Sprintf("failure-ip-%s", ip)
+	err := gocache.Increment(key, 1)
+	if err != nil {
+		gocache.Set(key, 1, -1)
+	}
+}
+
+
+func getFailureCountByUser(user int) (int, bool) {
+	key := fmt.Sprintf("failure-user-%d", user)
+	val, found := gocache.Get(key)
+	if !found {
+		return 0, false
+	}
+	return val.(int), true
+}
+
+func setFailureCountByUser(user int, cnt int) {
+	key := fmt.Sprintf("failure-user-%d", user)
+	gocache.Set(key, cnt, -1)
+}
+
+func incrementFailureCountByUser(user int) {
+	key := fmt.Sprintf("failure-user-%d", user)
 	err := gocache.Increment(key, 1)
 	if err != nil {
 		gocache.Set(key, 1, -1)
