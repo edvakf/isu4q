@@ -6,3 +6,5 @@ go get github.com/martini-contrib/render
 go get github.com/martini-contrib/sessions
 go get github.com/walf443/stopwatch
 go build -o golang-webapp .
+
+pkill golang-webapp
