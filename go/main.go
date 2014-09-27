@@ -166,5 +166,7 @@ func main() {
 func initialize() {
 	log.Println("initialize start")
 
+	gocache.Flush()
+
 	log.Println("initialize end")
 }
