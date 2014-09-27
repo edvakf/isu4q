@@ -114,10 +114,12 @@ func attemptLogin(req *http.Request) (*User, error) {
 	if banned, _ := isBannedIP(remoteAddr); banned {
 		return nil, ErrBannedIP
 	}
+	stopwatch.Watch("after isBannedIP")
 
 	if locked, _ := isLockedUser(user); locked {
 		return nil, ErrLockedUser
 	}
+	stopwatch.Watch("after isLockedUser")
 
 	if user == nil {
 		return nil, ErrUserNotFound
@@ -126,6 +128,7 @@ func attemptLogin(req *http.Request) (*User, error) {
 	if user.PasswordHash != calcPassHash(password, user.Salt) {
 		return nil, ErrWrongPassword
 	}
+	stopwatch.Watch("after calcPassHash")
 
 	succeeded = true
 	return user, nil
