@@ -2,11 +2,13 @@ package main
 
 import (
 	"database/sql"
+	"flag"
 	"fmt"
 	"github.com/go-martini/martini"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/martini-contrib/render"
 	"github.com/martini-contrib/sessions"
+	"github.com/walf443/stopwatch"
 	"net/http"
 	"strconv"
 )
@@ -46,6 +48,7 @@ func init() {
 }
 
 func main() {
+	flag.Parse()
 	m := martini.Classic()
 
 	store := sessions.NewCookieStore([]byte("secret-isucon"))
@@ -61,6 +64,7 @@ func main() {
 	})
 
 	m.Post("/login", func(req *http.Request, r render.Render, session sessions.Session) {
+		stopwatch.Reset("POST /login")
 		user, err := attemptLogin(req)
 
 		notice := ""
@@ -79,7 +83,9 @@ func main() {
 			return
 		}
 
+		stopwatch.Watch("before session set")
 		session.Set("user_id", strconv.Itoa(user.ID))
+		stopwatch.Watch("after session set")
 		r.Redirect("/mypage")
 	})
 
