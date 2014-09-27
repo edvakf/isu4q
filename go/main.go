@@ -31,14 +31,27 @@ var gocache = goCache.New(30*time.Second, 10*time.Second)
 var radix *Radix.Pool
 
 func init() {
-	dsn := fmt.Sprintf(
-		"%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local",
-		getEnv("ISU4_DB_USER", "isucon"),
-		getEnv("ISU4_DB_PASSWORD", "isucon"),
-		getEnv("ISU4_DB_HOST", "localhost"),
-		getEnv("ISU4_DB_PORT", "3306"),
-		getEnv("ISU4_DB_NAME", "isu4_qualifier"),
-	)
+	var dsn string
+	if getEnv("ISU4_DB_SOCK", "") == "" {
+		dsn = fmt.Sprintf(
+			"%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local",
+			getEnv("ISU4_DB_USER", "isucon"),
+			getEnv("ISU4_DB_PASSWORD", "isucon"),
+			getEnv("ISU4_DB_HOST", "localhost"),
+			getEnv("ISU4_DB_PORT", "3306"),
+			getEnv("ISU4_DB_NAME", "isu4_qualifier"),
+		)
+	} else {
+		dsn = fmt.Sprintf(
+			"%s:%s@unix(%s)/%s?parseTime=true&loc=Local",
+			getEnv("ISU4_DB_USER", "isucon"),
+			getEnv("ISU4_DB_PASSWORD", "isucon"),
+			getEnv("ISU4_DB_SOCK", ""),
+			getEnv("ISU4_DB_NAME", "isu4_qualifier"),
+		)
+		//dsn := "root@unix(/var/lib/mysql/mysql.sock)/isu4_qualifier?parseTime=true&loc=Local"
+	}
+	log.Printf("%s", dsn)
 
 	var err error
 
