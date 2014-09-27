@@ -119,6 +119,10 @@ func main() {
 		})
 	})
 
+	m.Get("/init", func(r render.Render, session sessions.Session) {
+		initialize()
+	})
+
 	sigchan := make(chan os.Signal)
 	signal.Notify(sigchan, os.Interrupt)
 	signal.Notify(sigchan, syscall.SIGTERM)
@@ -146,4 +150,10 @@ func main() {
 	}()
 
 	<-sigchan
+}
+
+func initialize() {
+	log.Println("initialize start")
+
+	log.Println("initialize end")
 }
