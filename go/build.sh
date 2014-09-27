@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 go get github.com/go-martini/martini
 go get github.com/go-sql-driver/mysql
