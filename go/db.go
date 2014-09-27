@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"time"
+	"github.com/walf443/stopwatch"
 )
 
 var (
@@ -95,11 +96,13 @@ func attemptLogin(req *http.Request) (*User, error) {
 		createLoginLog(succeeded, remoteAddr, loginName, user)
 	}()
 
+	stopwatch.Watch("before db query")
 	row := db.QueryRow(
 		"SELECT id, login, password_hash, salt FROM users WHERE login = ?",
 		loginName,
 	)
 	err := row.Scan(&user.ID, &user.Login, &user.PasswordHash, &user.Salt)
+	stopwatch.Watch("after db query")
 
 	switch {
 	case err == sql.ErrNoRows:

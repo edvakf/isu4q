@@ -16,6 +16,9 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/martini-contrib/render"
 	"github.com/martini-contrib/sessions"
+	"github.com/walf443/stopwatch"
+	"net/http"
+	"strconv"
 )
 
 var db *sql.DB
@@ -55,6 +58,7 @@ func init() {
 var port = flag.Uint("port", 0, "port to listen")
 
 func main() {
+	flag.Parse()
 	m := martini.Classic()
 	flag.Parse()
 
@@ -71,6 +75,7 @@ func main() {
 	})
 
 	m.Post("/login", func(req *http.Request, r render.Render, session sessions.Session) {
+		stopwatch.Reset("POST /login")
 		user, err := attemptLogin(req)
 
 		notice := ""
@@ -89,7 +94,9 @@ func main() {
 			return
 		}
 
+		stopwatch.Watch("before session set")
 		session.Set("user_id", strconv.Itoa(user.ID))
+		stopwatch.Watch("after session set")
 		r.Redirect("/mypage")
 	})
 
