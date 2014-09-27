@@ -134,7 +134,6 @@ func incrementFailureCount(ip string) {
 	}
 }
 
-
 func getFailureCountByUser(user int) (int, bool) {
 	key := fmt.Sprintf("failure-user-%d", user)
 	val, found := gocache.Get(key)
@@ -159,7 +158,6 @@ func incrementFailureCountByUser(user int) {
 
 func attemptLogin(req *http.Request) (*User, error) {
 	succeeded := false
-	user := &User{}
 
 	loginName := req.PostFormValue("login")
 	password := req.PostFormValue("password")
@@ -169,24 +167,14 @@ func attemptLogin(req *http.Request) (*User, error) {
 		remoteAddr = xForwardedFor
 	}
 
+	user, err := getUserByLogin(loginName)
+	if err != nil {
+		return nil, err
+	}
+
 	defer func() {
 		createLoginLog(succeeded, remoteAddr, loginName, user)
 	}()
-
-	stopwatch.Watch("before db query")
-	row := db.QueryRow(
-		"SELECT id, login, password_hash, salt FROM users WHERE login = ?",
-		loginName,
-	)
-	err := row.Scan(&user.ID, &user.Login, &user.PasswordHash, &user.Salt)
-	stopwatch.Watch("after db query")
-
-	switch {
-	case err == sql.ErrNoRows:
-		user = nil
-	case err != nil:
-		return nil, err
-	}
 
 	if banned, _ := isBannedIP(remoteAddr); banned {
 		return nil, ErrBannedIP
@@ -208,6 +196,32 @@ func attemptLogin(req *http.Request) (*User, error) {
 	stopwatch.Watch("after calcPassHash")
 
 	succeeded = true
+	return user, nil
+}
+
+func getUserByLogin(loginName string) (*User, error) {
+	key := fmt.Sprintf("user-%s", loginName)
+	cache, found := gocache.Get(key)
+	if found {
+		return cache.(*User), nil
+	}
+
+	user := &User{}
+	stopwatch.Watch("before db query")
+	row := db.QueryRow(
+		"SELECT id, login, password_hash, salt FROM users WHERE login = ?",
+		loginName,
+	)
+	err := row.Scan(&user.ID, &user.Login, &user.PasswordHash, &user.Salt)
+	stopwatch.Watch("after db query")
+
+	switch {
+	case err == sql.ErrNoRows:
+		user = nil
+	case err != nil:
+		return nil, err
+	}
+
 	return user, nil
 }
 

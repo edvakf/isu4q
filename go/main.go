@@ -188,6 +188,8 @@ func initialize() {
 
 	setFailureCacheFromDB()
 
+	setUserCache()
+
 	log.Println("initialize end")
 }
 
@@ -204,5 +206,22 @@ func setFailureCacheFromDB() {
 			log.Fatal(err)
 		}
 		setFailureCount(ip, cnt)
+	}
+}
+
+func setUserCache() {
+	rows, err := db.Query("SELECT * FROM users")
+	if err != nil {
+		log.Fatal(err)
+	}
+	for rows.Next() {
+		user := &User{}
+		err := rows.Scan(&user.ID, &user.Login, &user.PasswordHash, &user.Salt)
+		if err != nil {
+			log.Fatal(err)
+		}
+		key := fmt.Sprintf("user-%s", user.Login)
+		//log.Printf("%s, %+v", key, user)
+		gocache.Set(key, user, -1)
 	}
 }
