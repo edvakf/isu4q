@@ -13,3 +13,5 @@ mysql -h ${myhost} -P ${myport} -u ${myuser} ${mydb} < /home/isucon/webapp/go/sq
 mysql -h ${myhost} -P ${myport} -u ${myuser} ${mydb} < /home/isucon/webapp/go/sql/dummy_users.sql
 mysql -h ${myhost} -P ${myport} -u ${myuser} ${mydb} < /home/isucon/webapp/go/sql/dummy_log.sql
 mysql -h ${myhost} -P ${myport} -u ${myuser} ${mydb} < /home/isucon/webapp/go/sql/alter.sql
+
+curl http://localhost/init
