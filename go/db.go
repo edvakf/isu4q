@@ -29,11 +29,14 @@ func createLoginLog(succeeded bool, remoteAddr, login string, user *User) error 
 		userId.Valid = true
 	}
 
-	_, err := db.Exec(
-		"INSERT INTO login_log (`created_at`, `user_id`, `login`, `ip`, `succeeded`) "+
-			"VALUES (?,?,?,?,?)",
-		time.Now(), userId, login, remoteAddr, succ,
-	)
+	lg := LoginLog{
+		time:       time.Now(),
+		userId:     userId,
+		login:      login,
+		remoteAddr: remoteAddr,
+		succ:       succ,
+	}
+	chLoginLog <- lg
 
 	if succeeded {
 		setFailureCount(remoteAddr, 0)
@@ -43,7 +46,7 @@ func createLoginLog(succeeded bool, remoteAddr, login string, user *User) error 
 		incrementFailureCountByUser(user.ID)
 	}
 
-	return err
+	return nil
 }
 
 func isLockedUser(user *User) (bool, error) {

@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -29,6 +30,7 @@ var (
 )
 var gocache = goCache.New(30*time.Second, 10*time.Second)
 var radix *Radix.Pool
+var chLoginLog chan LoginLog
 
 func init() {
 	var dsn string
@@ -77,6 +79,9 @@ var redisport = flag.Uint("redis", 0, "port to redis")
 func main() {
 	m := martini.Classic()
 	flag.Parse()
+
+	chLoginLog = make(chan LoginLog, 10000)
+	go startLoginLogWorker()
 
 	var err error
 	if *redisport == 0 {
@@ -223,5 +228,57 @@ func setUserCache() {
 		key := fmt.Sprintf("user-%s", user.Login)
 		//log.Printf("%s, %+v", key, user)
 		gocache.Set(key, user, -1)
+	}
+}
+
+type LoginLog struct {
+	time       time.Time
+	userId     sql.NullInt64
+	login      string
+	remoteAddr string
+	succ       int
+}
+
+func startLoginLogWorker() {
+	for {
+		time.Sleep(100 * time.Millisecond)
+		var logs []LoginLog
+
+	L:
+		for {
+			select {
+			case lg := <-chLoginLog:
+				log.Printf("log : %+v", lg)
+				logs = append(logs, lg)
+			default:
+				break L
+			}
+		}
+
+		if len(logs) == 0 {
+			continue
+		}
+
+		sql := "INSERT INTO login_log (`created_at`, `user_id`, `login`, `ip`, `succeeded`) VALUES"
+		for i, lg := range logs {
+			if i != 0 {
+				sql += ","
+			}
+			sql += fmt.Sprintf(
+				"('%s', %d, '%s', '%s', %d)",
+				lg.time.Format("2006-01-02 15:04:05"),
+				lg.userId.Value,
+				strings.Replace(lg.login, "'", "''", -1),
+				lg.remoteAddr,
+				lg.succ,
+			)
+		}
+
+		log.Printf("%s", sql)
+
+		_, err := db.Exec(sql)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 }
